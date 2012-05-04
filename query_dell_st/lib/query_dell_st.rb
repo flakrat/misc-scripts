@@ -76,8 +76,7 @@ if options[:file].nil?
   raise "\nMandatory argument --svctag is missing, see --help for details\n" if options[:svc_tag].nil?
   raise "\nMandatory argument --svctag is missing, see --help for details\n" if options[:hostname].nil?
   # Set variables
-  hostname = options[:hostname]
-  node_list = {'hostname' => options[:hostname], 'svc_tag' => options[:svc_tag]}
+  node_list.push({'hostname' => options[:hostname], 'svc_tag' => options[:svc_tag]})
 else
   # Read file contents into array of hashes node_list
   if File.exists?(options[:file])
