@@ -11,6 +11,8 @@
 # Type        :  Tool
 #-----------------------------------------------------------------------------
 # History
+# 20120507 - mhanby - Added new cli option: --format that allows for output in
+#   csv or tab delimited format
 # 20120502 - mhanby - Initial creation of script. Currently it supports either
 #   single service tag lookup, or bulk via --file argument
 #
@@ -53,6 +55,12 @@ EOB
     options[:file] = file
   end
   
+  # Output options
+  options[:output_fmt] = nil
+  opts.on('--format FORMAT', 'Alter default output using one of these formats: tab, csv') do |output_fmt|
+    options[:output_fmt] = output_fmt
+  end
+  
   # Perform batch creation of users from file?
   #options[:debug] = nil
   opts.on('--debug', 'Additional debug output') { |o| options[:debug] = o }
@@ -68,13 +76,28 @@ end
 # parse! removes the processed args from ARGV
 optparse.parse!
 
+output_sep = nil # separator used for output, i.e. comma, \t ...
+
+unless options[:output_fmt].nil?
+  case options[:output_fmt].downcase
+  when "csv"
+    output_sep = ","
+  when "tab"
+    output_sep = "\t"
+  else
+    raise "Invalid output format specified, see --help for valid options"
+  end
+end
+
 # Array of hashes to store individual node data
 node_list = []
 
 # Raise exceptions for any missing args
 if options[:file].nil?
   raise "\nMandatory argument --svctag is missing, see --help for details\n" if options[:svc_tag].nil?
-  raise "\nMandatory argument --svctag is missing, see --help for details\n" if options[:hostname].nil?
+  if options[:hostname].nil?
+    options[:hostname] = 'unknown'
+  end
   # Set variables
   node_list.push({'hostname' => options[:hostname], 'svc_tag' => options[:svc_tag]})
 else
@@ -112,15 +135,26 @@ def dell_query(svc_tag)
   return [model, warranty_exp]
 end
 
+def print_output(node, index, sep)
+  if sep.nil?
+    puts "Host: #{node['hostname']}"
+    puts "\tModel: #{node['model']}"
+    puts "\tService Tag: #{node['svc_tag']}"
+    puts "\tWarranty Exp: #{node['warranty_exp']} days left"
+  else
+    if index == 0 # Print the column headers if this is the first node in the list
+      print 'hostname', sep, 'model', sep, 'service_tag', sep, 'warranty_exp_days', "\n"
+    end
+    print node['hostname'], sep, node['model'], sep, node['svc_tag'], sep, node['warranty_exp'], "\n"
+  end
+end
+
 node_list.each do |node|
   if node['svc_tag'] == "NA"
     node['model'], node['warranty_exp'], node['svc_tag'] = '<N/A>', '<N/A>', '<N/A>'
   else
     node['model'], node['warranty_exp'] = dell_query(node['svc_tag'])
   end
-  #TODO - Provide different output options, CSV, human readable, ...
-  puts "Host: #{node['hostname']}"
-  puts "\tModel: #{node['model']}"
-  puts "\tService Tag: #{node['svc_tag']}"
-  puts "\tWarranty Exp: #{node['warranty_exp']} days left"
+  
+  print_output(node, node_list.index(node), output_sep)
 end
