@@ -9,6 +9,7 @@
 # Date        :  2013-05-14 15:35:00
 # Type        :  Query job id and attempt to print in human form the absolute end
 #                time of the job based on the hard runtime request (h_rt)
+#
 # qstat -j 9130603 -r | grep h_rt | awk '{print $3}' | cut -d , -f 1 | cut -d = -f 2
 #
 # I at first thought I could obtain all of the information needed from the
@@ -39,7 +40,7 @@
 #   - Currently no error handling for a non existent job (i.e. job that is no longer running)
 #
 # TODO: more output options (csv, tab delim, XML, PDF)
-# TODO: error handling
+# DONE: error handling
 # TODO: query for all running jobs
 # DONE: query for specific user
 
@@ -133,8 +134,7 @@ end
 jobid = Array.new
 if options[:jobid]
   jobid = options[:jobid]
-  # Remove any duplicate job id's
-  jobid = jobid.uniq
+  jobid = jobid.uniq # Remove any duplicate job id's
 #else
 #  # Prompt user for input if not specified on command line:
 #  loop do
@@ -153,8 +153,7 @@ end
 userid = Array.new
 if options[:userid]
   userid = options[:userid]
-  # Remove any duplicate user id's
-  userid = userid.uniq
+  userid = userid.uniq # Remove any duplicate user id's supplied by --userid
 end
 
 # Begin Job class
@@ -166,17 +165,16 @@ class Job
     @valid_id = true
     
     # How do we prevent the object from being created if the given JobID doesn't exist?
-    #next unless @outxml.include?("unknown_jobs") # JobID doesn't exist
     if @outxml.include?("unknown_jobs")
       @valid_id = false 
     else
       pp @outxml if @debug
-      # convert the xml into a hash
+      # convert the xml into a hash using Crack rubygem
       @jobinfo = Hash.new
       @jobinfo = Crack::XML.parse(@outxml)
       pp @jobinfo if @debug
       
-      # Get the owner from the hash
+      # Get the job owner from the hash
       @owner = @jobinfo["detailed_job_info"]["djob_info"]["element"]["JB_owner"]
       
       # Get maximum runtime in seconds for the job based on the h_rt resource request
@@ -222,7 +220,7 @@ class Job
   # return list of running tasks for job
   def running_tasks
     out = Array.new
-    tasklist = Array.new
+    tasklist = Array.new # array of hashes
     IO.popen("qstat -u #{@owner} -s r | grep #{@jobid} ").each do |line|
       out << line.chomp
     end
@@ -264,17 +262,15 @@ class Job
   # print in table format
   def print_table
     runtime = seconds_to_units(@max_runtime.to_i)
-    #puts "=" * 50
-    #puts "  JobID: #{@jobid} - Owner: #{@owner}"
-    #puts "  Max Runtime: #{seconds_to_units(@max_runtime.to_i)}"
     @tasks.each do |task|
       printf "%-13s %-8s %-15s %-22s %s\n", @jobid, task['taskid'], @owner, task['end_time'], runtime
     end
-  end
+  end # end print_table()
+  
+  # Ugly output
   def print
     # Print report
     runtime = ''
-    #puts "=" * 50
     puts "  JobID: #{@jobid} - Owner: #{@owner}"
     puts "  Max Runtime: #{seconds_to_units(@max_runtime.to_i)}"
     puts ""
@@ -284,40 +280,38 @@ class Job
       puts "  #{task['taskid']}\t#{task['end_time']}"
     end
     puts "=" * 50
-  end
-
+  end # end print()
 end # End Job class
 
 userid.each do |user|
-  # list jobs running under the user account and add the job id to the jobid array
+  # list jobs running under the user account adding the job id to the jobid array
   puts user if debug
   outxml = ''
   IO.popen("qstat -u #{user} -s r -xml").each do |line|
     outxml << line.chomp
   end
   puts outxml if debug
-  #next if outxml.split("\n").grep(/unknown_jobs/)
-  next unless outxml.include?("JB_job_number") # user doesn't have any jobs
+  next unless outxml.include?("JB_job_number") # user doesn't have any jobs, skip processing user
   userinfo = Hash.new
   userinfo = Crack::XML.parse(outxml)
   pp userinfo if debug
-  # In the XML from qstat, joblist is an array if there are multiple jobs, if a single job, it's
+  # In the XML from qstat, joblist is an array if there are multiple jobs. A single job is
   # just a hash for the one job
   if userinfo["job_info"]["queue_info"]["job_list"].kind_of?(Array)
     userinfo["job_info"]["queue_info"]["job_list"].each do |job|
       puts job["JB_job_number"] if debug
       # Be sure to only add the id if it's unique. Array jobs will result in multiple
-      # occurances of the same job id
+      # occurances of the same job id, resulting in exponential output
       jobid << job["JB_job_number"] unless jobid.include?(job["JB_job_number"])
     end
-  else
+  else # only one running job for this user
     job = userinfo["job_info"]["queue_info"]["job_list"]["JB_job_number"]
     puts job if debug
     jobid << job unless jobid.include?(job)
   end
 end
 
-jobs = Array.new
+jobs = Array.new # array to hold job objects
 jobid.each do |id|
   jobs << Job.new(id, debug)
 end
@@ -327,6 +321,7 @@ end
 puts 'JobID         TaskID   Owner           Max End Time           Requested Run Time'
 puts '============  =======  ==============  =====================  =============================='
 
+# Print each of the jobs/tasks
 jobs.each do |job|
   if job.valid?
     job.print_table
