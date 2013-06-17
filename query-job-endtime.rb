@@ -41,7 +41,7 @@
 # TODO: more output options (csv, tab delim, XML, PDF)
 # TODO: error handling
 # TODO: query for all running jobs
-# COMPLETE: query for specific user
+# DONE: query for specific user
 
 # SGE env variables that should already be loaded in the users env
   # SGE_CELL=default
@@ -286,8 +286,7 @@ class Job
     puts "=" * 50
   end
 
-end
-# End Job class
+end # End Job class
 
 userid.each do |user|
   # list jobs running under the user account and add the job id to the jobid array
@@ -324,7 +323,7 @@ jobid.each do |id|
 end
 
 # Print the header
-#     9186455         0          curtish         2013/06/20 20:19:55
+#     9186455         0          johndoe         2013/06/20 20:19:55
 puts 'JobID         TaskID   Owner           Max End Time           Requested Run Time'
 puts '============  =======  ==============  =====================  =============================='
 
